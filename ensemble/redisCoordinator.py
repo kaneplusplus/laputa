@@ -6,14 +6,17 @@ import argparse, redis, string, random
 
 import cPickle as pickle
   
-def cnrPacket(commandString):
-  return {'type' : 'cnr', 'payload' : commandString, 'rq' : None}
+def execPacket(expr, rq):
+  return {'type':'exec', 'payload':expr, 'rq':rq}
 
-def funPacket(commandString, rq):
-  return {'type' : 'fun', 'payload' : commandString, 'rq' : rq}
+def evalPacket(expr, rq):
+  return {'type':'eval', 'payload':expr, 'rq':rq}
 
-def getPacket(varString, rq):
-  return {'type' : 'get', 'payload' : varString, 'rq' : rq}
+def publishPacket(pubType, expr, rq, rqw):
+  return {'type':pubType, 'payload':expr, 'rq':rq, 'rqw':rqw}
+
+def getPacket(varName, rq):
+  return {'type':'get', 'payload':varName, 'rq':rq}
 
 def random_key(size=6, chars=string.ascii_uppercase + string.digits):
   return ''.join(random.choice(chars) for x in range(size))
@@ -21,27 +24,72 @@ def random_key(size=6, chars=string.ascii_uppercase + string.digits):
 
 class RedisTasker:
   
-  def __init__(self, key, host="localhost", port=6379, db=0):
+  def __init__(self, key, host="localhost", port=6379, db=0, timeout=30):
     self.key = key
     self.host = host
     self.port = port
     self.db = db
+    self.timeout = timeout
     self.r = redis.StrictRedis(self.host, self.port, self.db)
 
-  def sendCommand(self, command):
-    self.r.lpush(self.key, pickle.dumps(cnrPacket(command)))
+  def __del__(self):
+    return self.r.delete(self.key)
 
-  def functionCall(self, functionCall):
+  def publishEval(self, expr):
+    return self.remoteExecute("eval", expr)
+
+  def publishExec(self, expr):
+    return self.remoteExecute("exec", expr)
+
+  def publishGet(self, expr):
+    return self.remoteExecute("get", expr)
+
+  def remoteExecute(self, pubType, expr):
+    # Generate a return queue name and a return queue counter so we know
+    # how many responses we're getting
+    rq=random_key()
+
+    # The worker queue tells us how many workers are working.
+    rqw=rq+".worker"
+
+    # Publish the job ot the listening workers.
+    print("publishing on " + self.key)
+    self.r.publish(self.key, pickle.dumps(publishPacket(pubType,expr,rq,rqw)))
+    resp=[]
+
+    # Note that the following may need to accomodate "lazy workers" that
+    # are active but take too long to return a value.
+
+    # Make sure we get into the while loop.
+    activeWorkers = 1
+    while activeWorkers or self.r.llen(rq):
+      rv=self.r.brpop(rq, self.timeout)
+      if rv:
+        resp.append(pickle.loads(rv[1]))
+
+      activeWorkers = int(self.r.get(rqw))
+    
+    # Clean-up.
+    self.r.delete(rqw)
+    self.r.delete(rq)
+
+    return resp
+      
+
+  def sendExec(self, expr):
+    self.r.lpush(self.key, pickle.dumps(execPacket(expr)))
+
+  def sendEval(self, expr):
     returnKey = random_key()
-    self.r.lpush(self.key, pickle.dumps(funPacket(val, returnKey)))
-    ret = pickle.loads(self.r.brpop(returnKey)[1])
+    self.r.lpush(self.key, pickle.dumps(evalPacket(expr, returnKey)))
+    ret = pickle.loads(self.r.brpop(returnKey, timeout)[1])
     self.r.delete(returnKey)
     return ret
 
   def getValue(self, val):
     returnKey = random_key()
     self.r.lpush(self.key, pickle.dumps(getPacket(val, returnKey)))
-    ret = pickle.loads(self.r.brpop(returnKey)[1])
+    ret = pickle.loads(self.r.brpop(returnKey, timout)[1])
     self.r.delete(returnKey)
     return ret
 
@@ -54,7 +102,7 @@ def verbose(s):
 
 def parseArgs():
   parser = argparse.ArgumentParser()
-  parser.add_argument("-k", "--key", nargs=1, default=None,
+  parser.add_argument("-k", "--key", nargs=1, default="testkey",
     help="The key to send the command on")
   parser.add_argument("-o", "--host", nargs=1, default="localhost",
     help="The host to send the commands to")
@@ -72,17 +120,17 @@ if __name__=='__main__':
   if (not args.key):
     raise(Exception("A worker queue key must be specified"))
 
-  print(args.key[0])
-  print(args.host)
-  print(args.port)
-  print(args.db)
-  rt = RedisTasker(args.key[0], args.host, args.port, args.db)
+  verbose(args.key)
+  verbose(args.host)
+  verbose(args.port)
+  verbose(args.db)
+  rt = RedisTasker(args.key, args.host, args.port, args.db)
   verbose("Tasker started.")
-
-  print("Sending cnr command")
-  rt.sendCommand("a = 4*3+2345")
-  returnValue = rt.getValue("a")
-  print(returnValue)
   
-#  r.delete(args.key)
+  print("Sending pubeval")
+  print(rt.publishEval("4*3+234"))
+
+  print(rt.publishExec("b=3.141596"))
+  print(rt.publishGet("b"))
+  
  

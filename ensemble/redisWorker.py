@@ -15,8 +15,8 @@ def verbose(s):
 
 def parseArgs():
   parser = argparse.ArgumentParser()
-  parser.add_argument("-k", "--key", nargs=1, default=None,
-    help="The key to listen for commands on")
+  parser.add_argument("-k", "--key", nargs=1, default="testkey",
+    help="The key to subscribe to commands on")
   parser.add_argument("-o", "--host", nargs=1, default="localhost",
     help="The host for the worker to connect to")
   parser.add_argument("-p", "--port", nargs=1, default=6379, type=int,
@@ -45,18 +45,20 @@ if __name__=='__main__':
   #   payload - the command to execute
   #   rq - the key for the return queue
   packet = pickle.loads( r.brpop(args.key[0])[1] )
+  print(packet)
   while packet['type'] != 'shutdown':
-    if packet['type'] == 'cnr':
+    print("message received")
+    if packet['type'] == 'exec':
       verbose("Executing command "+packet['payload'])
       exec(packet['payload'])
-    if packet['type'] == 'fun':
+    if packet['type'] == 'eval':
       # Need to add exception catching in case an assignment is made
       # in the eval string.
       ret = eval(packet['payload'])
       r.lpush(packet['rq'], pickle.dumps(ret))
     if packet['type'] == 'get':
       r.lpush(packet['rq'], pickle.dumps(locals()[packet['payload']]))
-    packet = pickle.loads(r.brpop(args.key)[1])
+    packet = pickle.loads(r.brpop(args.key[0])[1])
 
   verbose("Shutdown packet received. Worker shutting down.")
 
