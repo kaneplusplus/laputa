@@ -1,5 +1,5 @@
 ==============
-redisEnsemble
+cnidaria
 ==============
 
 Not written.

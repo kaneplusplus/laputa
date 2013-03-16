@@ -1,16 +1,14 @@
-#!/usr/bin/env python
-
-from __future__ import print_function
-
-import argparse, redis, string, random
-
+import redis, random
 import cPickle as pickle
-  
+ 
 def execPacket(expr, rq):
   return {'type':'exec', 'payload':expr, 'rq':rq}
 
 def evalPacket(expr, rq):
   return {'type':'eval', 'payload':expr, 'rq':rq}
+
+def shutdownPacket(expr, rq):
+  return {'type':'shutdown'}
 
 def publishPacket(pubType, expr, rq, rqw):
   return {'type':pubType, 'payload':expr, 'rq':rq, 'rqw':rqw}
@@ -18,13 +16,14 @@ def publishPacket(pubType, expr, rq, rqw):
 def getPacket(varName, rq):
   return {'type':'get', 'payload':varName, 'rq':rq}
 
-def random_key(size=6, chars=string.ascii_uppercase + string.digits):
+def random_key(size=6, chars='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'):
   return ''.join(random.choice(chars) for x in range(size))
 
 
-class RedisTasker:
+class coordinator:
   
-  def __init__(self, key, host="localhost", port=6379, db=0, timeout=30):
+  def __init__(self, key="testkey", host="localhost", port=6379, db=0, 
+    timeout=30):
     self.key = key
     self.host = host
     self.port = port
@@ -44,6 +43,9 @@ class RedisTasker:
   def publishGet(self, expr):
     return self.remoteExecute("get", expr)
 
+  def publishShutdown(self):
+    self.remoteExecute("shutdown", "")
+
   def remoteExecute(self, pubType, expr):
     # Generate a return queue name and a return queue counter so we know
     # how many responses we're getting
@@ -53,7 +55,6 @@ class RedisTasker:
     rqw=rq+".worker"
 
     # Publish the job ot the listening workers.
-    print("publishing on " + self.key)
     self.r.publish(self.key, pickle.dumps(publishPacket(pubType,expr,rq,rqw)))
     resp=[]
 
@@ -61,17 +62,18 @@ class RedisTasker:
     # are active but take too long to return a value.
 
     # Make sure we get into the while loop.
-    activeWorkers = 1
-    while activeWorkers or self.r.llen(rq):
-      rv=self.r.brpop(rq, self.timeout)
-      if rv:
-        resp.append(pickle.loads(rv[1]))
+    if pubType != "shutdown":
+      activeWorkers = 1
+      while activeWorkers or self.r.llen(rq):
+        rv=self.r.brpop(rq, self.timeout)
+        if rv:
+          resp.append(pickle.loads(rv[1]))
 
-      activeWorkers = int(self.r.get(rqw))
-    
-    # Clean-up.
-    self.r.delete(rqw)
-    self.r.delete(rq)
+        activeWorkers = int(self.r.get(rqw))
+      
+      # Clean-up.
+      self.r.delete(rqw)
+      self.r.delete(rq)
 
     return resp
       
@@ -92,9 +94,6 @@ class RedisTasker:
     ret = pickle.loads(self.r.brpop(returnKey, timout)[1])
     self.r.delete(returnKey)
     return ret
-
-def warning(s):
-  print("Warning: "+s+"\n", file=sys.stderr)
 
 def verbose(s):
   if args.verbose:
@@ -124,13 +123,7 @@ if __name__=='__main__':
   verbose(args.host)
   verbose(args.port)
   verbose(args.db)
-  rt = RedisTasker(args.key, args.host, args.port, args.db)
+  rt = coordinator(args.key, args.host, args.port, args.db)
   verbose("Tasker started.")
-  
-  print("Sending pubeval")
-  print(rt.publishEval("4*3+234"))
-
-  print(rt.publishExec("b=3.141596"))
-  print(rt.publishGet("b"))
   
  
