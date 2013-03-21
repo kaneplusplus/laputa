@@ -1,7 +1,7 @@
 import redis
 import cPickle as pickle
 
-class worker:
+class Worker:
 
   def __init__(self, key, host="localhost", port=6379, db=0):
     self.key=key
@@ -52,7 +52,7 @@ class worker:
           #print("decrementing " + packet['rqw'])
           self.r.decr(packet['rqw'])
 
-def parseArgs():
+def parse_args():
   parser = argparse.ArgumentParser()
   parser.add_argument("-k", "--key", nargs=1, default="testkey",
     help="The key to subscribe to commands on")
@@ -68,11 +68,11 @@ def parseArgs():
 
 if __name__=='__main__':
 
-  args = parseArgs()
+  args = parse_args()
   if (not args.key):
     raise(Exception("A key to the subscribe channel must be specified"))
 
-  w = worker (args.key, args.host, args.port, args.db)
+  w = Worker(args.key, args.host, args.port, args.db)
   w.service()
 
     

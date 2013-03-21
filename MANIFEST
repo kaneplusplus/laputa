@@ -3,7 +3,7 @@ CHANGES.txt
 LICENSE.txt
 README.txt
 setup.py
+cnidaria/Coordinator.py
+cnidaria/Worker.py
 cnidaria/__init__.py
-cnidaria/coordinator.py
-cnidaria/startLocalWorkers.py
-cnidaria/worker.py
+cnidaria/start_local_workers.py

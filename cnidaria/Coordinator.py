@@ -1,26 +1,26 @@
 import redis, random
 import cPickle as pickle
  
-def execPacket(expr, rq):
+def exec_packet(expr, rq):
   return {'type':'exec', 'payload':expr, 'rq':rq}
 
-def evalPacket(expr, rq):
+def eval_packet(expr, rq):
   return {'type':'eval', 'payload':expr, 'rq':rq}
 
-def shutdownPacket(expr, rq):
+def shutdown_packet(expr, rq):
   return {'type':'shutdown'}
 
-def publishPacket(pubType, expr, rq, rqw):
+def publish_packet(pubType, expr, rq, rqw):
   return {'type':pubType, 'payload':expr, 'rq':rq, 'rqw':rqw}
 
-def getPacket(varName, rq):
+def get_packet(varName, rq):
   return {'type':'get', 'payload':varName, 'rq':rq}
 
 def random_key(size=6, chars='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'):
   return ''.join(random.choice(chars) for x in range(size))
 
 
-class coordinator:
+class Coordinator:
   
   def __init__(self, key="testkey", host="localhost", port=6379, db=0, 
     timeout=30):
@@ -34,19 +34,19 @@ class coordinator:
   def __del__(self):
     return self.r.delete(self.key)
 
-  def publishEval(self, expr):
-    return self.remoteExecute("eval", expr)
+  def publish_eval(self, expr):
+    return self.remote_execute("eval", expr)
 
-  def publishExec(self, expr):
-    return self.remoteExecute("exec", expr)
+  def publish_exec(self, expr):
+    return self.remote_execute("exec", expr)
 
-  def publishGet(self, expr):
-    return self.remoteExecute("get", expr)
+  def publish_get(self, expr):
+    return self.remote_execute("get", expr)
 
-  def publishShutdown(self):
-    self.remoteExecute("shutdown", "")
+  def publish_shutdown(self):
+    self.remote_execute("shutdown", "")
 
-  def remoteExecute(self, pubType, expr):
+  def remote_execute(self, pub_type, expr):
     # Generate a return queue name and a return queue counter so we know
     # how many responses we're getting
     rq=random_key()
@@ -55,21 +55,21 @@ class coordinator:
     rqw=rq+".worker"
 
     # Publish the job ot the listening workers.
-    self.r.publish(self.key, pickle.dumps(publishPacket(pubType,expr,rq,rqw)))
+    self.r.publish(self.key, pickle.dumps(publish_packet(pub_type,expr,rq,rqw)))
     resp=[]
 
     # Note that the following may need to accomodate "lazy workers" that
     # are active but take too long to return a value.
 
     # Make sure we get into the while loop.
-    if pubType != "shutdown":
-      activeWorkers = 1
-      while activeWorkers or self.r.llen(rq):
+    if pub_type != "shutdown":
+      active_workers = 1
+      while active_workers or self.r.llen(rq):
         rv=self.r.brpop(rq, self.timeout)
         if rv:
           resp.append(pickle.loads(rv[1]))
 
-        activeWorkers = int(self.r.get(rqw))
+        active_workers = int(self.r.get(rqw))
       
       # Clean-up.
       self.r.delete(rqw)
@@ -78,28 +78,28 @@ class coordinator:
     return resp
       
 
-  def sendExec(self, expr):
-    self.r.lpush(self.key, pickle.dumps(execPacket(expr)))
+  def send_exec(self, expr):
+    self.r.lpush(self.key, pickle.dumps(exec_packet(expr)))
 
-  def sendEval(self, expr):
+  def send_eval(self, expr):
     returnKey = random_key()
-    self.r.lpush(self.key, pickle.dumps(evalPacket(expr, returnKey)))
-    ret = pickle.loads(self.r.brpop(returnKey, timeout)[1])
-    self.r.delete(returnKey)
+    self.r.lpush(self.key, pickle.dumps(eval_packet(expr, returnKey)))
+    ret = pickle.loads(self.r.brpop(return_key, timeout)[1])
+    self.r.delete(return_key)
     return ret
 
-  def getValue(self, val):
+  def get_value(self, val):
     returnKey = random_key()
-    self.r.lpush(self.key, pickle.dumps(getPacket(val, returnKey)))
-    ret = pickle.loads(self.r.brpop(returnKey, timout)[1])
-    self.r.delete(returnKey)
+    self.r.lpush(self.key, pickle.dumps(get_packet(val, return_key)))
+    ret = pickle.loads(self.r.brpop(return_key, timout)[1])
+    self.r.delete(return_key)
     return ret
 
 def verbose(s):
   if args.verbose:
     print(s)
 
-def parseArgs():
+def parse_args():
   parser = argparse.ArgumentParser()
   parser.add_argument("-k", "--key", nargs=1, default="testkey",
     help="The key to send the command on")
@@ -115,7 +115,7 @@ def parseArgs():
 
 if __name__=='__main__':
 
-  args = parseArgs() 
+  args = parse_args() 
   if (not args.key):
     raise(Exception("A worker queue key must be specified"))
 
@@ -123,7 +123,7 @@ if __name__=='__main__':
   verbose(args.host)
   verbose(args.port)
   verbose(args.db)
-  rt = coordinator(args.key, args.host, args.port, args.db)
+  rt = Coordinator(args.key, args.host, args.port, args.db)
   verbose("Tasker started.")
   
  
