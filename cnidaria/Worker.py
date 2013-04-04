@@ -1,9 +1,11 @@
+from __future__ import print_function
 import redis
 import cPickle as pickle
+from functools import partial
 
 class Worker:
 
-  def __init__(self, key, host="localhost", port=6379, db=0):
+  def __init__(self, key, host="localhost", port=6379, db=0, verbose=False):
     self.key=key
     self.host=host
     self.port=port
@@ -11,6 +13,7 @@ class Worker:
     self.r = redis.StrictRedis(self.host, self.port, self.db)
     # The environment where evals and exec's will take place.
     self.env = {}
+    self.vprint = (print if verbose else lambda x: None)
 
   def service(self):
     ps = self.r.pubsub()
@@ -18,11 +21,12 @@ class Worker:
   
     # We'll go until we get the signal to shutdown.
     for item in ps.listen(): 
+
       if item['type'] == 'message':
         packet = pickle.loads(item['data'])
         
         if packet['type'] == 'shutdown':
-          print("Shutdown message received")
+          self.vprint("Shutdown message received")
           return True
 
         else:
@@ -33,16 +37,31 @@ class Worker:
           rv=None
           try:
             if packet['type'] == 'eval':
-              #print("eval packet")
+              self.vprint("eval packet")
+              self.vprint("'''")
+              self.vprint(packet['payload'])
+              self.vprint("'''")
+              self.vprint("\n")
               rv = eval(packet['payload'], self.env)
             elif packet['type'] == 'exec':
-              #print("exec packet")
+              self.vprint("exec packet")
+              self.vprint("'''")
+              self.vprint(packet['payload'])
+              self.vprint("'''")
+              self.vprint("\n")
               exec(packet['payload'], self.env)
               rv = True
             elif packet['type'] == 'get':
-              #print("get packet")
+              self.vprint("get packet")
+              self.vprint("'''")
+              self.vprint(packet['payload'])
+              self.vprint("'''")
+              self.vprint("\n")
               rv = self.env[packet['payload']]
           except Exception as e:
+            self.vprint("Exception in packet processing")
+            self.vprint(e)
+            self.vprint("\n")
             rv = e
           #print("Pushing new packet onto "+packet['rq'])
           #print(rv)

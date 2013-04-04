@@ -25,11 +25,13 @@ class Coordinator:
   def __init__(self, key="testkey", host="localhost", port=6379, db=0, 
     timeout=30):
     self.key = key
-    self.host = host
-    self.port = port
-    self.db = db
     self.timeout = timeout
     self.r = redis.StrictRedis(self.host, self.port, self.db)
+
+  def __init__(self, redis_handle, key="testkey", timeout=30):
+    self.key=key
+    self.timeout=timeout
+    self.r=redis_handle
 
   def __del__(self):
     return self.r.delete(self.key)

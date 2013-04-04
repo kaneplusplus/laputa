@@ -1,3 +1,3 @@
-from Coordinator import *
-from Worker import *
-from start_local_workers import *
+from . import Coordinator 
+from . import Worker 
+from . import start_local_workers
