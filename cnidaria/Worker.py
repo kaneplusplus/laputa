@@ -2,6 +2,7 @@ from __future__ import print_function
 import redis
 import cPickle as pickle
 from functools import partial
+from util import *
 
 class Worker:
 
@@ -13,6 +14,7 @@ class Worker:
     self.r = redis.StrictRedis(self.host, self.port, self.db)
     # The environment where evals and exec's will take place.
     self.env = {}
+    self.guid = random_key()
     self.vprint = (print if verbose else lambda x: None)
 
   def service(self):
@@ -63,12 +65,9 @@ class Worker:
             self.vprint(e)
             self.vprint("\n")
             rv = e
-          #print("Pushing new packet onto "+packet['rq'])
-          #print(rv)
-          self.r.lpush(packet['rq'], pickle.dumps(rv))
+          self.r.lpush(packet['rq'], pickle.dumps( (self.guid, rv)) )
 
           # Decrement the return worker count and continue with the loop.
-          #print("decrementing " + packet['rqw'])
           self.r.decr(packet['rqw'])
 
 def parse_args():

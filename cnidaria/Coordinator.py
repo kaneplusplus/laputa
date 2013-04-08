@@ -1,25 +1,7 @@
 import redis, random
 import cPickle as pickle
+from util import *
  
-def exec_packet(expr, rq):
-  return {'type':'exec', 'payload':expr, 'rq':rq}
-
-def eval_packet(expr, rq):
-  return {'type':'eval', 'payload':expr, 'rq':rq}
-
-def shutdown_packet(expr, rq):
-  return {'type':'shutdown'}
-
-def publish_packet(pubType, expr, rq, rqw):
-  return {'type':pubType, 'payload':expr, 'rq':rq, 'rqw':rqw}
-
-def get_packet(varName, rq):
-  return {'type':'get', 'payload':varName, 'rq':rq}
-
-def random_key(size=6, chars='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'):
-  return ''.join(random.choice(chars) for x in range(size))
-
-
 class Coordinator:
   
   def __init__(self, key="testkey", host="localhost", port=6379, db=0, 
@@ -58,7 +40,7 @@ class Coordinator:
 
     # Publish the job ot the listening workers.
     self.r.publish(self.key, pickle.dumps(publish_packet(pub_type,expr,rq,rqw)))
-    resp=[]
+    resp={'worker':[], 'value':[]}
 
     # Note that the following may need to accomodate "lazy workers" that
     # are active but take too long to return a value.
@@ -68,8 +50,13 @@ class Coordinator:
       active_workers = 1
       while active_workers or self.r.llen(rq):
         rv=self.r.brpop(rq, self.timeout)
-        if rv:
-          resp.append(pickle.loads(rv[1]))
+        worker_resp = pickle.loads(rv[1])
+        if len(worker_resp) == 2:
+          resp['worker'] = resp['worker'].append(worker_resp[0])
+          return(rv[1])
+          resp['value'] = resp['value'].append(worker_resp[1])
+        else:
+          raise(Exception("Unexpected response length."))
 
         active_workers = int(self.r.get(rqw))
       
