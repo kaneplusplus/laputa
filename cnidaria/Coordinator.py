@@ -40,25 +40,19 @@ class Coordinator:
 
     # Publish the job ot the listening workers.
     self.r.publish(self.key, pickle.dumps(publish_packet(pub_type,expr,rq,rqw)))
-    resp={'worker':[], 'value':[]}
 
     # Note that the following may need to accomodate "lazy workers" that
     # are active but take too long to return a value.
 
     # Make sure we get into the while loop.
+    resp=[]
     if pub_type != "shutdown":
       active_workers = 1
-      while active_workers or self.r.llen(rq):
+      while (active_workers > 1) or self.r.llen(rq):
         rv=self.r.brpop(rq, self.timeout)
-        worker_resp = pickle.loads(rv[1])
-        if len(worker_resp) == 2:
-          resp['worker'] = resp['worker'].append(worker_resp[0])
-          return(rv[1])
-          resp['value'] = resp['value'].append(worker_resp[1])
-        else:
-          raise(Exception("Unexpected response length."))
-
-        active_workers = int(self.r.get(rqw))
+        if (rv != None):
+          resp.append(pickle.loads(rv[1]))
+          active_workers = int(self.r.get(rqw))
       
       # Clean-up.
       self.r.delete(rqw)
@@ -66,7 +60,6 @@ class Coordinator:
 
     return resp
       
-
   def send_exec(self, expr):
     self.r.lpush(self.key, pickle.dumps(exec_packet(expr)))
 
@@ -106,7 +99,7 @@ if __name__=='__main__':
 
   args = parse_args() 
   if (not args.key):
-    raise(Exception("A worker queue key must be specified"))
+    raise Exception("A worker queue key must be specified")
 
   verbose(args.key)
   verbose(args.host)
