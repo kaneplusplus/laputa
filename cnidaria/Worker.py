@@ -29,6 +29,7 @@ class Worker:
         
         if packet['type'] == 'shutdown':
           self.vprint("Shutdown message received")
+          return
 
         else:
           # Increment the return queue worker count. 

@@ -5,12 +5,12 @@ from util import *
 class Coordinator:
   
   def __init__(self, key="testkey", host="localhost", port=6379, db=0, 
-    timeout=30):
+    timeout=5):
     self.key = key
     self.timeout = timeout
     self.r = redis.StrictRedis(self.host, self.port, self.db)
 
-  def __init__(self, redis_handle, key="testkey", timeout=30):
+  def __init__(self, redis_handle, key="testkey", timeout=5):
     self.key=key
     self.timeout=timeout
     self.r=redis_handle
@@ -40,6 +40,7 @@ class Coordinator:
 
     # Publish the job ot the listening workers.
     self.r.publish(self.key, pickle.dumps(publish_packet(pub_type,expr,rq,rqw)))
+    
 
     # Note that the following may need to accomodate "lazy workers" that
     # are active but take too long to return a value.
@@ -48,11 +49,11 @@ class Coordinator:
     resp=[]
     if pub_type != "shutdown":
       active_workers = 1
-      while (active_workers > 1) or self.r.llen(rq):
+      while (active_workers > 0) or self.r.llen(rq):
         rv=self.r.brpop(rq, self.timeout)
         if (rv != None):
           resp.append(pickle.loads(rv[1]))
-          active_workers = int(self.r.get(rqw))
+        active_workers = int(self.r.get(rqw))
       
       # Clean-up.
       self.r.delete(rqw)
