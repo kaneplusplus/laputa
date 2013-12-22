@@ -40,7 +40,7 @@ Using laputa
 ---
 
 The laputa package should currently be considered "plumbing" for the
-elr package. When the interface stabilizes and the features are expanded 
+stat\_agg package. When the interface stabilizes and the features are expanded 
 a more complete user's guide will be added.
 
 Support
