@@ -4,7 +4,7 @@ def start_local_workers(nw=1, key="testkey", host="localhost", port=6379,
   db=0, init_string='', path="", verbose=False):
   rs='''
 import argparse
-from cnidaria import Worker
+from laputa import Worker
 w = Worker('KEY', 'HOST', PORT, DB, VERBOSE)
 w.service()
 '''
