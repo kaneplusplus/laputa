@@ -13,7 +13,7 @@ setup(
 #    url='http://pypi.python.org/pypi/TowelStuff/',
     license='LICENSE.txt',
     description='Distributed computing with Redis.',
-    long_description=open('README.txt').read(),
+    long_description=open('README.md').read(),
     install_requires=["argparse", "redis"]
 #        "Django >= 1.1.1",
 #        "caldav == 0.1.4",
