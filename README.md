@@ -7,7 +7,7 @@ Description
 ---
 
 laputa is a python package that provides an elastic, fault-tolerant,
-parallel computing foundation for the elr (ensemble learners with Redis) 
+parallel computing foundation for the stat\_agg (statistical aggregates)
 package. 
 
 Requirements
